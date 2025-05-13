@@ -1,12 +1,12 @@
-# Typst slides template
+# Effect Systems and Capture Checking in Scala 3
 
-This is a template for creating slides using [Typst](https://typst.app/) and [Polylux](https://github.com/andreasKroepelin/polylux).
+## Resource materials
 
-This template uses the [metropolis](https://github.com/andreasKroepelin/polylux/blob/main/themes/themes.typ) theme with some customizations for code snippets.
+### Formal
 
-## Usage
+- Capturing Types
+    - https://doi.org/10.1145/3618003
 
-1. Rename the `slides-template.typ` file to your desired name.
-2. Edit the file by adding your content.
-3. Push the file to the repository
-4. Access to the released slides in the `Releases` section of the repository.
+### Informal
+- https://noelwelsh.com/posts/direct-style/
+- https://medium.com/scala-3/scala-3-what-is-direct-style-d9c1bcb1f810
