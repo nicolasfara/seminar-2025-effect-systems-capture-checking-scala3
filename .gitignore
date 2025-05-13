@@ -1,3 +1,4 @@
 *.pdf
 .bsp/
 .scala-build/
+.metals/
