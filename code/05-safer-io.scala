@@ -1,7 +1,9 @@
 //> using option -language:strictEquality
 //> using option -language:experimental.saferExceptions
+//> using option -language:experimental.captureChecking
+//> using option -Xprint:cc Prints
 //> using option -Yexplicit-nulls
-package unsafeio
+package safeio
 
 import java.nio.file.Path
 import scala.util.Using
@@ -11,11 +13,11 @@ type EffectIO[R] = IO ?=> R
 
 trait IO:
   def println(content: String): Unit
-  def read[R](combine: IterableOnce[String] => R): R
+  def read[R](combine: IterableOnce[String]^ => R): R
 
 object IO:
   def println(content: String)(using io: IO): Unit = io.println(content)
-  def read[R](combine: IterableOnce[String] => R)(using io: IO): R = io.read(combine)
+  def read[R](combine: IterableOnce[String]^ => R)(using io: IO): R = io.read(combine)
 
   def fileHandler(path: Path): IO = new IO:
     override def println(content: String): Unit =
@@ -24,7 +26,7 @@ object IO:
         fos.append("\n")
       .get
 
-    override def read[R](combine: IterableOnce[String] => R): R =
+    override def read[R](combine: IterableOnce[String]^ => R): R =
       Using(scala.io.Source.fromFile(path.toString)): source =>
         val data = source.getLines()
         combine(data)
@@ -32,14 +34,14 @@ object IO:
 
   given consoleHandler: IO with
     override def println(content: String): Unit = scala.Predef.println(content)
-    override def read[R](combine: IterableOnce[String] => R): R =
+    override def read[R](combine: IterableOnce[String]^ => R): R =
       val data = scala.io.StdIn.readLine.linesIterator
       combine(data)
 
-  def run[R](program: EffectIO[R]): R = runWithHandler(program)(using consoleHandler)
-  def runWithHandler[R](program: EffectIO[R])(using io: IO): R = program(using io)
+  def run[R](program: EffectIO[R]): R^{program} = runWithHandler(program)(using consoleHandler)
+  def runWithHandler[R](program: EffectIO[R])(using io: IO): R^{program} = program(using io)
 
-object UnsafeIO:
+object SafeIO:
   import IO.consoleHandler
 
   def main(args: Array[String]): Unit =

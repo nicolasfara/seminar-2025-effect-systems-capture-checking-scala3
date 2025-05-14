@@ -1,0 +1,4 @@
+Doubling: 5
+Doubled: 10
+Doubling: 5
+Doubled: 10
