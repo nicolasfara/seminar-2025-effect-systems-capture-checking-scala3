@@ -396,6 +396,5 @@ def f(x: ->{c} Int): Int
 
 the argument `f` is allowed to use the capability `c`, but not any other.
 
-// #slide[
-//   #bibliography("bibliography.bib")
-// ]
+Code example: `03-thin-fat-arrow.scala`
+
