@@ -40,13 +40,13 @@ object IO:
   def runWithHandler[R](program: EffectIO[R])(using io: IO): R = program(using io)
 
 object UnsafeIO:
-  import IO.consoleHandler
+  import IO.{consoleHandler, fileHandler}
 
   def main(args: Array[String]): Unit =
     val res = IO.runWithHandler(doubleItAndPrint(5))(using consoleHandler)
     println(res)
-    // val iteratorResult = IO.runWithHandler(unsafeReadFile)(using fileHandler(Path.of("input.txt")))
-    // println(iteratorResult.iterator.mkString(", "))
+    val iteratorResult = IO.runWithHandler(unsafeReadFile)(using fileHandler(Path.of("input.txt")))
+    println(iteratorResult.iterator.mkString(", "))
 
   def doubleItAndPrint(value: Int): EffectIO[Int] =
     IO.println(s"Doubling: $value")

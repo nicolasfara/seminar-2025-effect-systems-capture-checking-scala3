@@ -374,15 +374,15 @@ Given a function with a by-name parameter:
 
 ```scala
 def f(x: => Int): Int
-```
 
-The actual argument `x` can refer to arbitrary capabilities, so:
-
-```scala
 f(if p(y) then throw Ex() else 1)
 ```
 
-This code is OK
+The actual argument `x` can refer to arbitrary capabilities.
+
+So the call above is allowed.
+
+== By-Name Parameters Types
 
 ```scala
 def f(x: -> Int): Int
@@ -397,4 +397,105 @@ def f(x: ->{c} Int): Int
 the argument `f` is allowed to use the capability `c`, but not any other.
 
 Code example: `03-thin-fat-arrow.scala`
+
+#focus-slide[
+  How can CC be used for more *safe* effecfull computation?
+]
+
+== IO example
+
+Let's try to build a simple *IO-based* program that can #bold[read] and #bold[write] to a _file_ or to the _console_.
+
+```scala
+trait IO:
+  def println(content: String): Unit
+  def read[R](combine: IterableOnce[String] => R): R
+```
+
+And our *effect type* is the following:
+
+```scala
+type EffectIO[R] = IO ?=> R
+```
+
+Pretty straightforward, right?
+
+Code example: `04-unsafe-io.scala`
+
+== Downsides
+
+Let's try to run the following code:
+
+```scala
+def main(args: Array[String]): Unit =
+  val res = IO.runWithHandler(doubleItAndPrint(5))(using
+    fileHandler(Path.of("input.txt"))
+  )
+  println(res)
+
+def unsafeReadFile: EffectIO[IterableOnce[String]] =
+  IO.read(identity)
+```
+
+Something very nasty happens here...
+
+== Runtime Error
+
+Executing the code above will result in a runtime error:
+
+```scala
+Exception in thread "main" java.io.IOException: Stream Closed
+        at java.base/java.io.FileInputStream.readBytes(Native Method)
+        at java.base/java.io.FileInputStream.read(FileInputStream.java:276)
+        ...
+```
+
+With *Capture Checking* we can rule out this kind of problems.
+
+== Capture-aware IO Implementation
+
+```scala
+type EffectIO[R] = IO ?=> R
+
+trait IO:
+  def println(content: String): Unit
+  def read[R](combine: IterableOnce[String]^ => R): R
+
+object IO:
+  def run[R](program: EffectIO[R]): R^{program} =
+    runWithHandler(program)(using consoleHandler)
+
+  def runWithHandler[R](program: EffectIO[R])(using io: IO): R^{program} =
+    program(using io)
+```
+
+This *capture-aware* implementation of `IO` is able to intercept the example above and throw a compile-time error.
+
+== Capture-aware IO Implementation
+
+If we try to compile the same code with the *capture-aware* implementation of `IO`, we get a compile-time error:
+
+```scala
+[error] ./05-safer-io.scala:60:13
+[error] Found:   (x: IterableOnce[String]^?) ->? box IterableOnce[String]^?
+[error] Required:(x: IterableOnce[String]^) => box IterableOnce[String]^?
+[error] 
+[error] Note that the universal capability `cap`
+[error] cannot be included in capture set ?
+[error]     IO.read(identity)
+```
+
+Any unsafe usage of `read` will be caught at compile time.
+
+Code example: `05-safer-io.scala`
+
+== Wrapping up
+
+They are pursuing the #bold[direct-style] approach to model effects in Scala 3.
+
+This simplify the code and make it #underline[easier to reason about].
+
+But *less safe* than the monadic approach.
+
+The *capture checking* mechanism is able to catch a lot of problems at compile time trying to have more safety in the #bold[direct-style] approach.
 
