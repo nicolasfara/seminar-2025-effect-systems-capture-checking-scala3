@@ -160,22 +160,38 @@ Also in this case the *effects* are _explicitly_ defined in the function signatu
 
 The implementation is _closer_ to the *imperative style*, and the _effects_ are _directly_ handled in the code.
 
-== Downsides of both approaches
+== Direct-style effect systems
 
 #components.side-by-side[
-  === Direct Style
-
-  #fa-circle-xmark() 
-  
+  === Direct style
+  #fa-circle-check() *Easier* to reason about \
+  #fa-circle-check() *Easier* to compose \
+  #fa-circle-check() *Less* "boilerplate" \
+  #fa-circle-xmark() *Problems* with higher-order functions \
 ][
-  === Monadic Style
-
-  #fa-circle-xmark() *Overprovision* of effects \
-  #fa-circle-xmark() Effects are not (easily) *composable*\* \
-  #fa-circle-xmark() Good *understanding* of the library \
-  #fa-circle-xmark() *Cognitive load* overhead \
-  #fa-circle-check() *Safe* effect handling (by construction) \
+  === Monadic style
+  #fa-circle-check() *Powerfull* way to handle effects \
+  #fa-circle-check() Usually *safer* than direct-style \
+  #fa-circle-xmark() *More* boilerplate \
+  #fa-circle-xmark() *More* complex to reason about \
 ]
+
+// == Downsides of both approaches
+
+// #components.side-by-side[
+//   === Direct Style
+
+//   #fa-circle-xmark() 
+  
+// ][
+//   === Monadic Style
+
+//   #fa-circle-xmark() *Overprovision* of effects \
+//   #fa-circle-xmark() Effects are not (easily) *composable*\* \
+//   #fa-circle-xmark() Good *understanding* of the library \
+//   #fa-circle-xmark() *Cognitive load* overhead \
+//   #fa-circle-check() *Safe* effect handling (by construction) \
+// ]
 
 #focus-slide[
   Where is *`Scala 3`* going?
