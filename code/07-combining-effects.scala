@@ -54,22 +54,26 @@ object Raise:
     break(Left(error))
 
   extension [L, R](either: Either[L, R]^)
-    def ?(using l: Label[Left[L, Nothing]]^): R^{either, l} = either match
+    def ?(using l: Label[Left[L, Nothing]]^): R^{l} = either match
       case Left(error) => fail(error)
       case Right(value) => value
 
 // -----------
 
+import IO.{ read, fileHandler }
+import Raise.fail
+
 def ifOddLinesRaise: (IO, CanRaise[String]) ?=> String =
-  val lineCount = IO.read(_.iterator.size)
-  if lineCount % 2 != 0 then Raise.fail("File has an even number of lines")
-  else IO.read(_.mkString(", "))
+  val lineCount = read(_.iterator.size)
+  if lineCount % 2 != 0 then fail("File has an even number of lines")
+  else read(_.mkString(", "))
 
 @main def main(): Unit =
   val file = Path.of("input.txt")
-  val result = IO.runWithHandler(using IO.fileHandler(file)):
-    Raise.raise:
-      ifOddLinesRaise
+  val result =
+    IO.runWithHandler(using fileHandler(file)):
+      Raise.raise:
+        ifOddLinesRaise
   result match
     case Left(error) => println(s"Failed with error: $error")
     case Right(value) => println(s"Success with value: $value")
