@@ -180,7 +180,7 @@ The implementation is _closer_ to the *imperative style*, and the _effects_ are 
 
 #only("2")[
   #align(center)[
-    \*That's my *personal opinion*! #fa-smile()
+    \*That's my *personal view*! #fa-smile()
   ]
 ]
 // == Downsides of both approaches
