@@ -19,7 +19,7 @@ object IO:
   def println(content: String)(using io: IO): Unit = io.println(content)
   def read[R](combine: IterableOnce[String]^ => R)(using io: IO): R = io.read(combine)
 
-  def fileHandler(path: Path): IO = new IO:
+  def fileHandler(path: Path^): IO^{path} = new IO:
     override def println(content: String): Unit =
       Using(FileWriter(path.toFile(), true)): fos =>
         fos.append(content)
