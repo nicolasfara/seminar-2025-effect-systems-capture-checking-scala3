@@ -172,10 +172,17 @@ The implementation is _closer_ to the *imperative style*, and the _effects_ are 
   === Monadic style
   #fa-circle-check() *Powerfull* way to handle effects \
   #fa-circle-check() Usually *safer* than direct-style \
-  #fa-circle-xmark() *More* boilerplate \
   #fa-circle-xmark() *More* complex to reason about \
+  #fa-circle-xmark() Requires *confidence* with the library \
 ]
 
+#v(1.5em)
+
+#only("2")[
+  #align(center)[
+    \*That's my *personal opinion*! #fa-smile()
+  ]
+]
 // == Downsides of both approaches
 
 // #components.side-by-side[
@@ -214,8 +221,8 @@ At a first look, this code #bold[seems to be correct], but...
 #only("2")[
   === Problematic Code
   ```scala
-  val later = usingLogFile { file => () => file.write(0) }
-  later() // crash
+  val later = usingLogFile { file => (y: Int) => file.write(y) }
+  later(10) // crash
   ```
 
   When `later` is executed it tries to write to a closed file.
@@ -247,9 +254,9 @@ The `^` turns the `FileOutputStream` into a *capability*, whose #bold[lifetime] 
 
 If we try to execute the problematic code again, we get a #emph[compile-time error]:
 ```scala
-|  val later = usingLogFile { f => () => f.write(0) }
+|  val later = usingLogFile { file => (y: Int) => file.write(y) }
 |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-|The expression's type () => Unit is not allowed to capture the root capability `cap`.
+|The expression's type Int => Unit is not allowed to capture the root capability `cap`.
 |This usually means that a capability persists longer than its allowed lifetime.
 ```
 
@@ -301,12 +308,6 @@ Note: this assume a "capture-aware" implementation of `LazyList`.
 - Enables "region-based" allocation (safely).
 - Reason about capabilities associated with memory locations.
 
-== Capabilities and Capturing Types
-
-Capture checking is done in term of _captuing types_ of the form $T\^{c_1,c_2,dots,c_n}$.
-- $T$ is a type
-- ${c_1,c_2,dots,c_n}$ is a *capture set* consisting of references to capabilities $c_1,c_2,dots,c_n$
-
 == Capability
 
 A *capability* is (syntactically) a #emph[method], or a #emph[class-paramter], a #emph[local variable], or the `this` of an enclosing class.
@@ -321,7 +322,7 @@ The most sweeping capability (from which all others are derived) is `cap` (unive
 If `T` is a type, then `T^` is a capability type with capture set `{cap}`,
 meaning that `T` can capture #emph[any capability].
 
-== Example
+== Capability Hierarchy
 
 ```scala
 class FileSystem
@@ -341,16 +342,14 @@ def test(fs: FileSystem^) =
 ```
 Code example: `02-logger-example.scala`
 
-== Subtyping Relation
+== Capabilities and Capturing Types
 
-Capturing types comes with a *subtyping* relation:
-
-#quote[capturing types with "smaller" capture sets are #underline[subtypes] of types with larger capture sets]
-
-If a type `T` does not have a #emph[capture set], then it is called *pure*, and it is a #emph[subtype] of any capturing type that adds a capture set to `T`.
+Capture checking is done in term of _captuing types_ of the form $T\^{c_1,c_2,dots,c_n}$.
+- $T$ is a type
+- ${c_1,c_2,dots,c_n}$ is a *capture set* consisting of references to capabilities $c_1,c_2,dots,c_n$
 
 #align(center)[
-  $mono(T <: T #math.hat {c_1,c_2} <: T #math.hat {c_1,c_2,dots,c_n})$
+  `{cap}` is the root, more sweeping capability.
 ]
 
 == Function Types
@@ -413,6 +412,54 @@ def f(x: ->{c} Int): Int
 the argument `f` is allowed to use the capability `c`, but not any other.
 
 Code example: `03-thin-fat-arrow.scala`
+
+== Subtyping Relation
+
+Capturing types comes with a *subtyping* relation:
+
+#quote[capturing types with "smaller" capture sets are #underline[subtypes] of types with larger capture sets]
+
+If a type `T` does not have a #emph[capture set], then it is called *pure*, and it is a #emph[subtype] of any capturing type that adds a capture set to `T`.
+
+#align(center)[
+  $T <: T #math.hat {c_1,c_2} <: T #math.hat {c_1,c_2,dots,c_n}$ 
+
+  $T_1\^C_1 <: T_2\^C_2$ if $C_1 <: C_2$ and $T_1 <: T_2$
+  #v(1em)
+]
+A subcapturing relation $C_1 <: C_2$ holds if $C_2$ #bold[accounts] for all the capabilities in $C_1$.
+
+// That means that one of the following condition must be true:
+// - $c in C_2$
+// - $c$'s type has a captuing set $C$ and $C_2$ #bold[accounts] for all the capabilities in $C$.
+
+== Escape checking
+
+If a *capturing type* is an instance of a #underline[type variable], that capturing type is #underline[not allowed] to carry the *universal capability* `cap`.
+
+The *capture set* of a type has to be present in the _environment_ when the type is instantiated from a type variable.
+
+But `cap` is #bold[not itself available] as a global entity in the environment.
+
+== Reasoning steps for raising the error
+
+```scala
+def usingLogFile[T](op: FileOutputStream^ => T): T =
+  val logFile = FileOutputStream("log")
+  val result = op(logFile)
+  logFile.close()
+  result
+
+val later = usingLogFile { file => (y: Int) => file.write(y) }
+```
+
+1. The parameter `file` has type `FileOutputStream^` making it a *capability*.
+2. Therefore, the type of the expression: `Int ->{file} Unit`
+3. Consequently, `(file: FileOutputStream^) => Int ->{file} Unit`
+4. The closure type is `FielOutputStream^ => T` for some instantiated type `T`.
+5. We cannot instantiate `T` with `Int ->{file} Unit` since the *expected function type is not dependent*.
+  So the smallest supertype that matches is `Int ->{cap} Unit`.
+6. The type variable `T` is instantiated with `Int ->{cap} Unit`, which *is not possible*
 
 #focus-slide[
   How can CC be used for more *safe* effecfull computation?

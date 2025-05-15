@@ -15,7 +15,7 @@ object LoggerExample:
   class Logger(fs: FileSystem^):
     def log(s: String): Unit = fs.write(s) // Write to a log file, using `fs`
 
-  def test(fs: FileSystem^) =
+  def test(fs: FileSystem^): LazyList[Int]^{fs} =
     val l: Logger^{fs} = Logger(fs)
     l.log("hello world!")
     val xs =
