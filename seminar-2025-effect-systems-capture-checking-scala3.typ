@@ -3,34 +3,18 @@
 #import "@preview/fontawesome:0.5.0": *
 #import "@preview/ctheorems:1.1.3": *
 #import "@preview/numbly:0.1.0": numbly
+#import "@preview/codly:1.3.0": *
+#import "@preview/codly-languages:0.1.1": *
 #import "utils.typ": *
 
-// Pdfpc configuration
-// typst query --root . ./example.typ --field value --one "<pdfpc-file>" > ./example.pdfpc
-#let pdfpc-config = pdfpc.config(
-    duration-minutes: 30,
-    start-time: datetime(hour: 14, minute: 10, second: 0),
-    end-time: datetime(hour: 14, minute: 40, second: 0),
-    last-minutes: 5,
-    note-font-size: 12,
-    disable-markdown: false,
-    default-transition: (
-      type: "push",
-      duration-seconds: 2,
-      angle: ltr,
-      alignment: "vertical",
-      direction: "inward",
-    ),
-  )
-
-#let proof = thmproof("proof", "Proof")
+#show: codly-init.with()
+#codly(languages: (scala: (name: [scala])), default-color: red, display-name: false, display-icon: false)
 
 #show: metropolis-theme.with(
   aspect-ratio: "16-9",
   footer: self => self.info.institution,
   config-common(
     // handout: true,
-    preamble: pdfpc-config,
     show-bibliography-as-footnote: bibliography(title: none, "bibliography.bib"),
   ),
   config-info(
@@ -42,7 +26,7 @@
       )
     ),
     date: datetime.today().display("[day] [month repr:long] [year]"),
-    // institution: [University of Bologna],
+    institution: [Alma Mater Studiorum -- Università di Bologna],
     // logo: align(right)[#image("images/disi.svg", width: 55%)],
   ),
 )
@@ -50,14 +34,14 @@
 #set text(font: "Fira Sans", weight: "light", size: 20pt)
 #show math.equation: set text(size: 20pt)
 
-#set raw(tab-size: 4)
-#show raw: set text(size: 1em)
-#show raw.where(block: true): block.with(
-  fill: luma(240),
-  inset: (x: 1em, y: 1em),
-  radius: 0.7em,
-  width: 100%,
-)
+// #set raw(tab-size: 4)
+// #show raw: set text(size: 1em)
+// #show raw.where(block: true): block.with(
+//   fill: luma(240),
+//   inset: (x: 1em, y: 1em),
+//   radius: 0.7em,
+//   width: 100%,
+// )
 
 #show bibliography: set text(size: 0.75em)
 #show footnote.entry: set text(size: 0.75em)
@@ -66,49 +50,76 @@
 
 #title-slide()
 
-// == Outline <touying:hidden>
-
-// #components.adaptive-columns(outline(title: none, indent: 1em))
-
 = What we care about
 
-== Reasoning & Composition
+== Reasoning and Composition
 
 One of core values of #bold[functional programming] are *reasoning* and *composition*.
 
+#warning-block("Side Effects")[
 _*Side effects*_ stops us from achieving this goal.
+]
 
 But every (useful) program has to #underline[interact] with the outside world.
 
 In #bold[functional programming], replacing _side effects_ with something that helps achieving these goals is an #underline[open problem].
 
-#v(1em)
+#pause
 
-#align(center)[
-  A possible solution is to use *effects systems*.
+#feature-block("Effect Systems to the rescue")[
+  *Effect systems* are a possible solution to this problem.
 ]
+
+// #v(1em)
+
+// #align(center)[
+//   A possible solution is to use *effects systems*.
+// ]
 
 = Effects
 
 == What is an *effect*?
 
-#quote[_Effects_ are aspects of the computation that go beyond describing shapes of values.]
+#note-block([Possible _effect_ definition])[
+  _Effects_ are #underline[aspects of the computation] that go beyond describing #bold[shapes of values].
+]
 
-In a strongly typed language, we #emph[want] to use the type system to #underline[track them].
+In a #underline[strongly typed language], we #emph[want] to use the type system to *track them*.
 
 === What is an effect?
 
-#underline[What] is modeled as an effect is a question of language or library design.
+#underline[What] is modeled as an *effect* is a question of language or library design.
 
-- *Reading* or *writing* to mutable state outside functions
-- *Throwing* an exception to indicate abnormal termination
-- *IO* operations
-- *Network* operations
-- *Suspending* or *resuming* computations
+- #bold[Reading] or #bold[writing] to mutable state outside functions
+- #bold[Throwing] an exception to indicate abnormal termination
+- #bold[IO] operations
+- #bold[Network] operations
+- #bold[Suspending] or #bold[resuming] computations
 
 == What is an effect system?
 
-*Effect systems* extends the guarantees of programming languages from type safety to _effect safety_: all the effects are #underline[eventually handled], and not accidentally handled by the wrong handler.
+#feature-block("Effect Systems")[
+An *Effect system* extends the guarantees of programming languages from type safety to _effect safety_: all the effects are #underline[eventually handled], and not accidentally handled by the wrong handler.
+]
+
+#focus-slide[How many of you *have used* an effect system before?]
+
+== Java Checked Exceptions
+
+```java
+public String readFile(String path) throws IOException {
+    // read file content
+}
+```
+The `throws IOException` clause is an *effect* that indicates that the function may raise an `IOException`.
+
+The compiler #underline[forces] the caller to handle the possible exceptions.
+
+#feature-block("The most adopted form of effect system")[
+  Java *checked exceptions* are the most widely adopted effect system in the wild.
+]
+
+== Two main approaches
 
 #components.side-by-side[
 === Continuation-passing style
@@ -125,7 +136,7 @@ In a strongly typed language, we #emph[want] to use the type system to #underlin
 - Code _closer_ to *imperative* style and *easier* to reason about
 ]
 
-== Taste of effect systems types
+== The two style in Scala
 
 === Monad-based effect systems
 
@@ -159,7 +170,7 @@ Also in this case the *effects* are _explicitly_ defined in the function signatu
 
 The implementation is _closer_ to the *imperative style*, and the _effects_ are _directly_ handled in the code.
 
-== Direct-style effect systems
+== Pros and Cons\*
 
 #components.side-by-side[
   === Direct style
@@ -179,7 +190,7 @@ The implementation is _closer_ to the *imperative style*, and the _effects_ are 
 
 #only("2")[
   #align(center)[
-    \*That's my *personal view*! #fa-smile()
+    \*That's my *personal interpretation*! #fa-smile()
   ]
 ]
 // == Downsides of both approaches
@@ -252,12 +263,14 @@ The `^` turns the `FileOutputStream` into a *capability*, whose #bold[lifetime] 
 == Compile-time Error
 
 If we try to execute the problematic code again, we get a #emph[compile-time error]:
-```scala
+#local(number-format: none, zebra-fill: none, fill: luma(240),
+```
 |  val later = usingLogFile { file => (y: Int) => file.write(y) }
 |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 |The expression's type Int => Unit is not allowed to capture the root capability `cap`.
 |This usually means that a capability persists longer than its allowed lifetime.
 ```
+)
 
 It is trivial to observe that `logFile` capability *escapes* in the closure passed to `usingLogFile`.
 
