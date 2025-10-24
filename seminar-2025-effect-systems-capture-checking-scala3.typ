@@ -80,7 +80,7 @@ _*Side effects*_ stops us from achieving this goal.
 
 But every (useful) program has to #underline[interact] with the outside world.
 
-In #bold[functional programming], replacing _side effects_ with something that helps achieving these goals is a #underline[open problem].
+In #bold[functional programming], replacing _side effects_ with something that helps achieving these goals is an #underline[open problem].
 
 #v(1em)
 
@@ -100,15 +100,15 @@ In a strongly typed language, we #emph[want] to use the type system to #underlin
 
 #underline[What] is modeled as an effect is a question of language or library design.
 
-- _Reading_ or _writing_ to mutable state outside functions
-- _throwing and exception_ to indicate abnormal termination
-- I/O operations
-- _Network_ operations
-- _Suspending_ or _resuming_ computations
+- *Reading* or *writing* to mutable state outside functions
+- *Throwing* an exception to indicate abnormal termination
+- *IO* operations
+- *Network* operations
+- *Suspending* or *resuming* computations
 
 == What is an effect system?
 
-*Effect systems* extends the guarantees of programming languages from type safety to _effect safety_: all the effects are eventually _handled_, and not accidentally handled by the wrong handler.
+*Effect systems* extends the guarantees of programming languages from type safety to _effect safety_: all the effects are #underline[eventually handled], and not accidentally handled by the wrong handler.
 
 #components.side-by-side[
 === Continuation-passing style
@@ -139,9 +139,9 @@ def op(id: Int): ZIO[Config & Logger, Error, Result] =
   yield result
 ```
 
-Everything is `flat-mapped`.
+Everything is `flatMap`ped.
 
-Required to deeply #bold[understand] the library.
+Requires to deeply #bold[understand] the library.
 
 When the #bold[complexity] increases, the monadic type may becomes more complex,
 and *difficult to reason about*.
@@ -149,11 +149,10 @@ and *difficult to reason about*.
 === Direct-style effect systems
 
 ```scala
-def op(id: Int): (Config, Logger) ?=> Either[Error, Result] = {
+def op(id: Int): (Config, Logger) ?=> Either[Error, Result] =
   Log.log(s"Processing $id")
   if (id < 0) Left(InvalidIdError)
   else Right(compute(id))
-}
 ```
 
 Also in this case the *effects* are _explicitly_ defined in the function signature.
@@ -539,13 +538,11 @@ This *capture-aware* implementation of `IO` is able to intercept the example abo
 If we try to compile the same code with the *capture-aware* implementation of `IO`, we get a compile-time error:
 
 ```scala
-[error] ./05-safer-io.scala:60:13
-[error] Found:   (x: IterableOnce[String]^?) ->? box IterableOnce[String]^?
-[error] Required:(x: IterableOnce[String]^) => box IterableOnce[String]^?
-[error] 
-[error] Note that the universal capability `cap`
-[error] cannot be included in capture set ?
-[error]     IO.read(identity)
+Found:    (x: IterableOnce[String]^?) ->? IterableOnce[String]^?
+Required: IterableOnce[String]^ => IterableOnce[String]^?
+
+where:    => refers to a fresh root capability created in anonymous function of type (using contextual$4: safeio.IO): IterableOnce[String] when checking argument to parameter combine of method read
+          ^  refers to the universal root capability
 ```
 
 Any unsafe usage of `read` will be caught at compile time.
