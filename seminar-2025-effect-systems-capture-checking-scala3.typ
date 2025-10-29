@@ -102,7 +102,7 @@ In a #underline[strongly typed language], we #emph[want] to use the type system 
 An *Effect system* extends the guarantees of programming languages from type safety to _effect safety_: all the effects are #underline[eventually handled], and not accidentally handled by the wrong handler.
 ]
 
-#focus-slide[How many of you *have used* an effect system before?]
+#focus-slide[How many of you *have dealt* with an effect system?]
 
 == Java Checked Exceptions
 
@@ -126,7 +126,7 @@ The compiler #underline[forces] the caller to handle the possible exceptions.
 
 - Explicit control flow manipulation
 - Enables advanced patterns: _non-local returns_, _backtracking_, _coroutines_, ...
-- _Powerful_ composition but *hard to reason about*
+- _Powerful_ but *hard to reason about*
 
 ][
 === Direct style
@@ -136,7 +136,7 @@ The compiler #underline[forces] the caller to handle the possible exceptions.
 - Code _closer_ to *imperative* style and *easier* to reason about
 ]
 
-== The two style in Scala
+== The two styles in Scala
 
 === Monad-based effect systems
 
@@ -214,7 +214,235 @@ The implementation is _closer_ to the *imperative style*, and the _effects_ are 
   Where is *`Scala 3`* going?
 ]
 
-= Motivations
+#slide(title: "Where is Scala 3 going?")[
+  #figure(image("images/direct-vs-monadic-scala.jpg"))
+]
+
+= Safer exceptions in Scala 3
+
+== Why Exceptions?
+
+Exceptions are an *ideal* mechanism for error handling in many situations.
+
+- They #bold[propagates] error conditions with minimal boilerplate;
+- #bold[Zero-overhead] for the "happy path";
+- Are #bold[debug-friendly], with stack traces and all;
+
+```scala
+def readFile(path: String): String =
+  val source = Source.fromFile(path)
+  try
+    source.getLines().mkString("\n")
+  finally
+    source.close()
+```
+
+== Why not Exceptions?
+
+Exceptions in Scala and many other languages *are not reflected* in the type system. \
+This means that an #bold[essential] part of the function's contract is not *statically checked*.
+
+#components.side-by-side(columns: (auto, 1fr))[
+  A #strike[good] example are *Java checked exceptions*:
+
+  - Do the #bold[right thing], in principle;
+  - Widely regarded as a #bold[mistake] (difficult to deal with)
+][
+  #figure(image("images/java-checked-exceptions.jpg", width: 100%))
+]
+
+None of the Java' successor or build in the JVM has copied this mechanism.
+
+Anders Hejlsberg's statement on why C\# does not have checked exceptions. #footnote(link("https://www.artima.com/articles/the-trouble-with-checked-exceptions"))
+
+== The problem with Java's checked exceptions
+
+Java's checked exceptions are #bold[inflexible], due to *lack of polymorphism*.
+
+```scala
+  def map[B](f: A => B): List[B]
+```
+
+In the Java model, function `f` #bold[is not allowed] to throw checked exceptions.
+
+The following code is invalid:
+
+```scala
+xs.map(x => if x < limit then x * x else throw LimitExceeded())
+```
+
+A workaround is to #bold[wrap] the exception in an unchecked one:
+
+```scala
+try
+  xs.map(x => if x < limit then x * x else throw Wrapper(LimitExceeded()))
+catch case Wrapper(ex) => throw ex
+```
+
+Ugh! That's why checked exceptions in Java are not very popular #fa-smile()
+
+== Monadic effects -- The dilemma
+
+/ Dilemma: Exceptions are easy to use only as long we #underline[forget static type checking].
+
+A popular alternative solution is to use the #bold[error monad], aka `Either`:
+
+```scala
+def readFile(path: String): Either[IOException, String] = ...
+```
+
+This approach #bold[enables] static checking of possible errors, however:
+
+- Make the code #bold[more complex] to #bold[harder to refactor]
+- The classical problem of #bold[composing] with other monadic effects
+
+== From Effects to Capabilities
+
+The `map` function work so poorly with checked exceptions because forces the parameters *to not throw* any checked exception.
+
+```scala
+def map[B, E](f: A => B throws E): List[B] throws E
+```
+
+This assumes a type `A throws E` to indicate a computation of type `A` that may throw exceptions of type `E`.
+
+#fa-warning() Lot of *cerimony* we don't want to deal with!
+
+#pagebreak()
+
+There is a way to avoid all this #bold[cerimony] by *changing the way we think about effects*.
+
+#feature-block("From effects to capabilities")[
+Instead of concentrating on #bold[possible effects] such as _"this code might throw an exception"_, concentrate on *capabilities* such as _"this code needs the capability to throw an exception"_.
+]
+
+== The `CanThrow` capability
+
+#note-block("Effect as capability")[
+  In the "effect as capability" approach, an *effect* is modeled as an (implicit) parameter of a #underline[certain type].
+]
+
+```scala
+erased class CanThrow[-E <: Exception]
+```
+
+For exceptions, the capability is `CanThrow[E]`, meaning that the code is allowed to throw exceptions of type `E`.
+
+```scala
+infix type throws[R, -E <: Exception] = CanThrow[E] ?=> R
+```
+
+```scala
+def m[T](x: T)(using CanThrow[E]): T
+def m[T](x: T): T throws E
+```
+
+#pagebreak()
+
+```scala
+def m(x: T): U throws E1 | E2
+def m(x: T): U throws E1 throws E2
+def m(x: T)(using CanThrow[E1], CanThrow[E2]): U
+def m(x: T)(using CanThrow[E1])(using CanThrow[E2]): U
+def m(x: T)(using CanThrow[E1]): U throws E2
+```
+
+The `CanThrow/throws` capability propagates the `CanThrow` requirement outwards. But how this capability is created?
+
+```scala
+try
+  erased given CanThrow[Ex1 | ... | ExN] = compiletime.erasedValue
+  body
+catch ...
+```
+
+= Example
+
+== Example
+// Enable the experimental feature:
+// ```scala
+// import language.experimental.saferExceptions
+// ```
+
+Define a `LimitExceeded` exception and a function that may throw it:
+
+```scala
+val limit = 10e9
+class LimitExceeded extends Exception
+def f(x: Double): Double =
+  if x < limit then x * x else throw LimitExceeded()
+```
+
+#only("2")[
+We get this compile-time error:
+
+#local(number-format: none, zebra-fill: none, fill: luma(240),
+```
+  if x < limit then x * x else throw LimitExceeded()
+                               ^^^^^^^^^^^^^^^^^^^^^
+The capability to throw exception LimitExceeded is missing.
+```
+)
+]
+
+#pagebreak()
+
+```scala
+def f(x: Double): Double throws LimitExceeded =
+  if x < limit then x * x else throw LimitExceeded()
+```
+
+The capability is injected by the `try/catch` block.
+
+```scala
+@main def test(xs: Double*) =
+  try println(xs.map(f).sum)
+  catch case ex: LimitExceeded => println("too large")
+```
+
+== Caveats
+
+The current capability model allows to *declare* and *check* the thrown exceptions of #underline[first-order] code.
+
+But as it stands, it does not give us enough mechanism to enforce the absence of capabilities for arguments to *higher-order* functions.
+
+```scala
+def escaped(xs: Double*): () => Int =
+  try () => xs.map(f).sum
+  catch case ex: LimitExceeded => () => -1
+```
+
+#pagebreak()
+
+Expands to:
+
+```scala
+// compiler-generated code
+def escaped(xs: Double*): () => Int =
+  try
+    given ctl: CanThrow[LimitExceeded] = ???
+    () => xs.map(x => f(x)(using ctl)).sum
+  catch case ex: LimitExceeded => -1
+```
+
+But if you try to call escaped like this:
+
+```scala
+val g = escaped(1, 2, 1000000000)
+g() // throws LimitExceeded even if we enclosed it in a try/catch
+```
+
+#pagebreak()
+
+What's missing is that `try` #bold[should enforce] that the capabilities it generates *do not escape* as free variables in the result of its body.
+
+It makes sense to describe such scoped effects as *ephemeral capabilities*-they have #bold[lifetimes] that cannot be extended to delayed code in a lambda.
+#v(2em)
+#only("2")[
+  #align(center)[#text(size: 1.2em)[Hey, some #fa-rust() vibes here!]]
+]
+
+= Capture Checking
 
 == Motivating Example
 
