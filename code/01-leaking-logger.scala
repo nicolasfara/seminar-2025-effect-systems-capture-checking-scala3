@@ -1,4 +1,5 @@
 //> using option -language:experimental.captureChecking
+//> using option -explain
 import java.io.FileOutputStream
 
 object LeakingLogger:
