@@ -470,13 +470,13 @@ Code example: `01-leaking-logger.scala`
 
 == Capture Checking
 
-Capture checking enables to spot this kind of problems *statically*.
+*Capture Checking* enables to spot this kind of problems #bold[statically].
 
-In Scala, by enabling *Capture Checking* via:
+_Capture Checking_ is an experimental feature in Scala 3 that can be enabled with:
 ```scala
 import language.experimental.captureChecking
 ```
-it is possible to re-write the previous code as follows:
+It is possible to re-write the previous code as follows:
 
 ```scala
 def usingLogFile[T](op: FileOutputStream^ => T): T =
@@ -493,16 +493,54 @@ The `^` turns the `FileOutputStream` into a *capability*, whose #bold[lifetime] 
 If we try to execute the problematic code again, we get a #emph[compile-time error]:
 #local(number-format: none, zebra-fill: none, fill: luma(240),
 ```
-|  val later = usingLogFile { file => (y: Int) => file.write(y) }
-|              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-|The expression's type Int => Unit is not allowed to capture the root capability `cap`.
-|This usually means that a capability persists longer than its allowed lifetime.
+[error] ./code/01-leaking-logger.scala:7:13
+[error] local reference f leaks into outer capture set of type parameter T of method usingLogFile in object LeakingLogger
+[error]     val a = usingLogFile { f => () => f.write(0) }
+[error]             ^^^^^^^^^^^^
 ```
 )
 
 It is trivial to observe that `logFile` capability *escapes* in the closure passed to `usingLogFile`.
 
 But of course, this mechanism is able to detect more #emph[complex cases].
+
+== Rust analogy
+
+This mechanism is similar to the #bold[lifetimes] and #bold[borrowing] mechanism in #fa-rust():
+
+```rust
+fn using_log_file<T>(op: impl FnOnce(&mut File) -> T) -> T {
+    let mut log_file = File::create("log").unwrap();
+    let result = op(&mut log_file);
+    // log_file is automatically closed here (Drop trait)
+    result
+}
+```
+
+#pagebreak()
+
+Calling code:
+
+```rust
+using_log_file(|f| { || { f.write(&[0]) } });
+```
+
+#local(number-format: none, zebra-fill: none, fill: luma(240),
+```
+   Compiling playground v0.0.1 (/playground)
+error: lifetime may not live long enough
+  --> src/main.rs:64:26
+   |
+64 |  using_log_file(|f| { || { f.write(&[0]) } });
+   |                 --  ^^^^^^^^^^^^^^^^^^^^ returning this value requires
+   | that `'1` must outlive `'2`
+   |                       ||
+   |                       |return type of closure `{...}` contains a
+   | lifetime `'2` has type `&'1 mut File`
+  
+```
+)
+
 
 == Complex Example
 
@@ -536,7 +574,10 @@ val xs = usingLogFile: f =>
 ]
 ]
 
-Note: this assume a "capture-aware" implementation of `LazyList`.
+#only("3")[
+  Note: this assume a "capture-aware" implementation of `LazyList`.
+]
+
 
 == Applicability
 
@@ -568,7 +609,6 @@ meaning that `T` can capture #emph[any capability].
 class FileSystem
 class Logger(fs: FileSystem^):
   def log(s: String): Unit = ... // Write to a log file, using `fs`
-
 def test(fs: FileSystem^) =
   val l: Logger^{fs} = Logger(fs)
   l.log("hello world!")
@@ -580,7 +620,7 @@ def test(fs: FileSystem^) =
       }
   xs
 ```
-Code example: `02-logger-example.scala`
+// Code example: `02-logger-example.scala`
 
 == Capabilities and Capturing Types
 
@@ -673,33 +713,56 @@ A subcapturing relation $C_1 <: C_2$ holds if $C_2$ #bold[accounts] for all the 
 // - $c in C_2$
 // - $c$'s type has a captuing set $C$ and $C_2$ #bold[accounts] for all the capabilities in $C$.
 
-== Escape checking
+== Escape Checking
 
-If a *capturing type* is an instance of a #underline[type variable], that capturing type is #underline[not allowed] to carry the *universal capability* `cap`.
-
-The *capture set* of a type has to be present in the _environment_ when the type is instantiated from a type variable.
-
-But `cap` is #bold[not itself available] as a global entity in the environment.
+#feature-block("Escape Checking")[
+  *Capabilities* follow the _scoping discipline_, meaning that capture sets can contain only capabilities that are visible at the point where the set is defined.
+]
 
 == Reasoning steps for raising the error
 
-```scala
-def usingLogFile[T](op: FileOutputStream^ => T): T =
-  val logFile = FileOutputStream("log")
-  val result = op(logFile)
-  logFile.close()
-  result
+// ```scala
+// def usingLogFile[T](op: FileOutputStream^ => T): T =
+//   val logFile = FileOutputStream("log")
+//   val result = op(logFile)
+//   logFile.close()
+//   result
+// val later = usingLogFile { file => (y: Int) => file.write(y) }
+// ```
 
-val later = usingLogFile { file => (y: Int) => file.write(y) }
+#local(number-format: none, zebra-fill: none, fill: luma(240),
+```
+  val later = usingLogFile { f => () => f.write(0) }
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  ./01-leaking-logger.scala:7:26
+  Found:    (f: java.io.FileOutputStream^) ->'s2 () ->{f} Unit
+  Required: java.io.FileOutputStream^ => () ->'s3 Unit
+  
+  Note that capability f cannot be included in outer capture set 's3.
+```
+)
+
+1. The parameter `file` has type `FileOutputStream^` making it a *capability*;
+2. Therefore, the type of the expression: `() ->{f} Unit`;
+3. Consequently, `(f: FileOutputStream^) =>'s2 () ->{f} Unit`, for some set `'s2`;
+4. The closure type is `FileOutputStream^ => T` for some instantiated type `T`;
+5. `T` must have shape `() ->'s3 Unit`, for some set `'s3` at `later` level;
+6. That set cannot include `f`, since `f` is not in scope at that level;
+
+== Restrictions for mutable variables
+
+Another restriction applies to #bold[mutable variables].
+
+```scala
+var loophole: () => Unit = () => ()
+usingLogFile { f =>
+  loophole = () => f.write(0)
+}
+loophole()
 ```
 
-1. The parameter `file` has type `FileOutputStream^` making it a *capability*.
-2. Therefore, the type of the expression: `Int ->{file} Unit`
-3. Consequently, `(file: FileOutputStream^) => Int ->{file} Unit`
-4. The closure type is `FielOutputStream^ => T` for some instantiated type `T`.
-5. We cannot instantiate `T` with `Int ->{file} Unit` since the *expected function type is not dependent*.
-  So the smallest supertype that matches is `Int ->{cap} Unit`.
-6. The type variable `T` is instantiated with `Int ->{cap} Unit`, which *is not possible*
+This will not compile either, since the _capture set_ of `loophole` cannot refer to `f`,
+which is not in scope at that level.
 
 #focus-slide[
   How can CC be used for more *safe* effecfull computation?
@@ -766,9 +829,8 @@ trait IO:
 
 object IO:
   def run[R](program: EffectIO[R]): R^{program} =
-    runWithHandler(program)(using consoleHandler)
-
-  def runWithHandler[R](program: EffectIO[R])(using io: IO): R^{program} =
+    run(program)(using consoleHandler)
+  def run[R](program: EffectIO[R])(using io: IO): R^{program} =
     program(using io)
 ```
 
@@ -778,25 +840,269 @@ This *capture-aware* implementation of `IO` is able to intercept the example abo
 
 If we try to compile the same code with the *capture-aware* implementation of `IO`, we get a compile-time error:
 
-```scala
-Found:    (x: IterableOnce[String]^?) ->? IterableOnce[String]^?
-Required: IterableOnce[String]^ => IterableOnce[String]^?
-
-where:    => refers to a fresh root capability created in anonymous function of type (using contextual$4: safeio.IO): IterableOnce[String] when checking argument to parameter combine of method read
-          ^  refers to the universal root capability
+#local(number-format: none, zebra-fill: none, fill: luma(240),
 ```
+Found:    (x: IterableOnce[String]^'s1) ->'s2 (IterableOnce[String]^'s3)?
+Required: IterableOnce[String]^ => (IterableOnce[String]^'s4)?
+
+Note that capability cap is not included in capture set {}.
+```
+)
 
 Any unsafe usage of `read` will be caught at compile time.
 
 Code example: `05-safer-io.scala`
 
+= Capability Polymorphism
+
+== 
+
+It is convenient sometimes to write operations *parametrized* over a capture set of capabilities.
+
+Consider a `Source` on which `Listeners` can be registered and which they can hold certain capabilities.
+
+```scala
+class Source[X^]:
+  private var listeners: Set[Listener^{X}] = Set.empty
+  def register(x: Listener^{X}): Unit =
+    listeners += x
+
+  def allListeners: Set[Listener^{X}] = listeners
+```
+
+The type variable `X^` can be instantiated with a set of arbitrary capabilities.
+Thus, `X` #bold[can occur] in capture sets in *its scope*.
+
+== Example
+
+Capture-set variables can be #bold[inferred] like regular type variables. When they should be instantiated #bold[explicitly] one supplies a concrete capture set. For instance:
+
+```scala
+class Async extends caps.SharedCapability
+
+def listener(async: Async): Listener^{async} = ???
+
+def test1(async1: Async, others: List[Async]) =
+  val src = Source[{async1, others*}]
+  ...
+```
+
+Here `src` is instantiated to `Source` on which listeners can refer to the `async1` capability,
+or to any of the capabilities in `others`.
+
+#pagebreak()
+
+The following code is valid:
+
+```scala
+src.register(listener(async1))
+others.map(listener).foreach(src.register)
+val ls: Set[Listener^{async, others*}] = src.allListeners
+```
+
+= Capability Classifiers
+
+== Introduction
+
+Capabilities are *extremely versatile*.
+
+#components.side-by-side[
+They may represents:
+- Exceptions
+- Continuations,
+- I/O
+- Mutation
+- Information flow
+- security permissions
+- ...
+][
+  Sometimes we want to #bold[restrict] or #bold[classify] what kind of capabilities are expected or returned in a context.
+
+  We might want only *control* capabilities such as `CanThrow` or `Label`s but no others.
+
+  Or we only want *mutation*, but no other capabilities.
+]
+
+#pagebreak()
+
+For instance
+
+```scala
+trait Control extends SharedCapability, Classifier
+```
+
+The Gears library #footnote(link("https://github.com/lampepfl/gears")) uses the `Control` classifier in its `Async` definition:
+
+```scala
+trait Async extends Control
+```
+
+#warning-block("Restriction")[
+  Unlike normal inheritance, classifiers #bold[restrict] the capture set of a capability.
+]
+
+== Example
+
+```scala
+def f(using async: Async) = body
+```
+
+We have the guarantee that any capabilities captured by `async` *must* be a `Control` capability.
+
+A classifier is a `class` or `trait` extending *directly* the `Classifier` trait.
+
+So with definition, `Control` is a classifier trait, but `Async` is not, since it extends `Classifier` indirectly through `Control`.
+
+#note-block("Classifiers are unique")[
+A class cannot extend directly or transitively at the same time two unrelated classifier traits.
+If a class transitively extends two classifier `C1` and `C2`, then one of them must be a #bold[subtrait] of the other.
+]
+
+== Predefined Classifiers
+
+```scala
+trait Classifier
+
+sealed trait Capability
+
+trait SharedCapability extends Capability Classifier
+trait Control extends SharedCapability, Classifier
+
+trait ExclusiveCapability extends Capability, Classifier
+trait Mutable extends ExclusiveCapability, Classifier
+```
+
+= Separation Checking
+
+== Introduction
+
+*Separation Checking* is an extension of the capture checking that enforces unique, un-aliased access to capabilities.
+
+#feature-block("Separation Checking")[
+  The purpose of *separation checking* is to ensure that certain accesses to capabilities are #bold[not aliased].
+]
+
+== Example
+
+Consider matrix multiplication:
+
+```scala
+def multiply(a: Matrix, b: Matrix, c: Matrix): Unit
+```
+
+Such signature formulation do not tell us which matrices are supposed to be _inputs_, and which one is the _output_.
+
+It #bold[does not guarantee] that an input matrix is not re-used as output matrix.
+
+== With Separation Checking
+
+With separation checking, we can write:
+
+```scala
+class Matrix(nrows: Int, ncols: Int) extends Mutable:
+  update def setElem(i: Int, j: Int, x: Double): Unit = ???
+  def getElem(i: Int, j: Int): Double = ???
+```
+
+We declare the `setElem` method with the `update` modifier, indicating that it has *side effects*.
+
+#pagebreak()
+
+With separation checking, the following definition has a #bold[special] meaning:
+
+```scala
+def multiply(a: Matrix, b: Matrix, c: Matrix^): Unit
+```
+
+Now `c` carries the _universal capability_.
+
+The following _two_ properties are ensured:
+
+- Matrices `a`, and `b` are #bold[read-only]. `multiply` will not call their update method.
+- Matrices `a`, and `b` #bold[are different] from `c`. But `a` and `b` may refer to the same matrix.
+
+=== Unaliased access
+
+Effectively, anything that can be updated must be *unaliased*.
+
+== The `Mutable` trait
+
+```scala
+trait Mutable extends ExclusiveCapability, Classifier
+```
+
+It is used to types that define *update methods* using a new soft modifier `update`.
+
+=== Example
+
+```scala
+class Ref(init: Int) extends Mutable:
+  private var current = init
+  def get: Int = current
+  update def set(x: Int): Unit = current = x
+```
+
+`update` can only be used in classes or objects that extend `Mutable`.
+
+- An #bold[update method] is allowed to access exclusive capabilities in method's env
+- A #bold[normal method] may access exclusive capabilities only if they are defined locally, or passed as parameters.
+
+== Mutable Types
+
+#feature-block("Mutable Types Definition")[
+  A type is *mutable* if it extends `Mutable` and it has an `update` method (or class) as non-private member or constructor.
+]
+
+When we create an instance of a *mutable* type we always add `cap` to its capture set.
+
+```scala
+val ref: Ref[Int]^ = new Ref[Int](0)
+```
+== Read-only Capabilities
+
+if `x` is an exclusive capability of a type extending `Mutable`, `x.rd` is its associated *read-only* capability.
+
+It can be considered as a #bold[shared capability].
+
+#warning-block("Read-only capability")[
+  A read-only capability #bold[does not allow] access to mutable fields.
+]
+
+== Implicitly added capture sets
+
+A reference to a type extending `Mutable` gets an implicit capture set `{cap.rd}` when *no explicit capture set* is provided.
+
+```scala
+def mul(a: Matrix, b: Matrix, c: Matrix^): Unit
+```
+
+expands to:
+
+```scala
+def mul(a: Matrix^{cap.rd}, b: Matrix^{cap.rd}, c: Matrix^{cap}): Unit
+```
+
+Separation checking will ensure that `a` and `b` are different from `c`.
+
 == Wrapping up
 
-They are pursuing the #bold[direct-style] approach to model effects in Scala 3.
+#components.side-by-side(columns: (1.5fr, 2fr))[
+  #figure(image("images/oxidizing-scala.png", width: 100%))
+][
+  - Scala 3 is *oxidizing* towards more #bold[safe] effect handling
+    - A lot of #fa-rust() vibes!
+  - *Capabilities* are a powerful and #bold[general] way to model effects
+  - Bring *more safety* without sacrificing #bold[ease of use]
+  - Still highly #bold[experimental]
+    - Oriented for _library authors_
+    - More safe _stdlib_
+]
 
-This simplify the code and make it #underline[easier to reason about].
+// They are pursuing the #bold[direct-style] approach to model effects in Scala 3.
 
-But *less safe* than the monadic approach.
+// This simplify the code and make it #underline[easier to reason about].
 
-The *capture checking* mechanism is able to catch a lot of problems at compile time trying to have more safety in the #bold[direct-style] approach.
+// But *less safe* than the monadic approach.
+
+// The *capture checking* mechanism is able to catch a lot of problems at compile time trying to have more safety in the #bold[direct-style] approach.
 
