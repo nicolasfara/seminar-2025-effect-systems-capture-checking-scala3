@@ -3,34 +3,18 @@
 #import "@preview/fontawesome:0.5.0": *
 #import "@preview/ctheorems:1.1.3": *
 #import "@preview/numbly:0.1.0": numbly
+#import "@preview/codly:1.3.0": *
+#import "@preview/codly-languages:0.1.1": *
 #import "utils.typ": *
 
-// Pdfpc configuration
-// typst query --root . ./example.typ --field value --one "<pdfpc-file>" > ./example.pdfpc
-#let pdfpc-config = pdfpc.config(
-    duration-minutes: 30,
-    start-time: datetime(hour: 14, minute: 10, second: 0),
-    end-time: datetime(hour: 14, minute: 40, second: 0),
-    last-minutes: 5,
-    note-font-size: 12,
-    disable-markdown: false,
-    default-transition: (
-      type: "push",
-      duration-seconds: 2,
-      angle: ltr,
-      alignment: "vertical",
-      direction: "inward",
-    ),
-  )
-
-#let proof = thmproof("proof", "Proof")
+#show: codly-init.with()
+#codly(languages: (scala: (name: [scala])), default-color: red, display-name: false, display-icon: false)
 
 #show: metropolis-theme.with(
   aspect-ratio: "16-9",
   footer: self => self.info.institution,
   config-common(
     // handout: true,
-    preamble: pdfpc-config,
     show-bibliography-as-footnote: bibliography(title: none, "bibliography.bib"),
   ),
   config-info(
@@ -42,7 +26,7 @@
       )
     ),
     date: datetime.today().display("[day] [month repr:long] [year]"),
-    // institution: [University of Bologna],
+    institution: [Alma Mater Studiorum -- Università di Bologna],
     // logo: align(right)[#image("images/disi.svg", width: 55%)],
   ),
 )
@@ -50,14 +34,14 @@
 #set text(font: "Fira Sans", weight: "light", size: 20pt)
 #show math.equation: set text(size: 20pt)
 
-#set raw(tab-size: 4)
-#show raw: set text(size: 1em)
-#show raw.where(block: true): block.with(
-  fill: luma(240),
-  inset: (x: 1em, y: 1em),
-  radius: 0.7em,
-  width: 100%,
-)
+// #set raw(tab-size: 4)
+// #show raw: set text(size: 1em)
+// #show raw.where(block: true): block.with(
+//   fill: luma(240),
+//   inset: (x: 1em, y: 1em),
+//   radius: 0.7em,
+//   width: 100%,
+// )
 
 #show bibliography: set text(size: 0.75em)
 #show footnote.entry: set text(size: 0.75em)
@@ -66,56 +50,83 @@
 
 #title-slide()
 
-// == Outline <touying:hidden>
-
-// #components.adaptive-columns(outline(title: none, indent: 1em))
-
 = What we care about
 
-== Reasoning & Composition
+== Reasoning and Composition
 
 One of core values of #bold[functional programming] are *reasoning* and *composition*.
 
+#warning-block("Side Effects")[
 _*Side effects*_ stops us from achieving this goal.
+]
 
 But every (useful) program has to #underline[interact] with the outside world.
 
 In #bold[functional programming], replacing _side effects_ with something that helps achieving these goals is an #underline[open problem].
 
-#v(1em)
+#pause
 
-#align(center)[
-  A possible solution is to use *effects systems*.
+#feature-block("Effect Systems to the rescue")[
+  *Effect systems* are a possible solution to this problem.
 ]
+
+// #v(1em)
+
+// #align(center)[
+//   A possible solution is to use *effects systems*.
+// ]
 
 = Effects
 
 == What is an *effect*?
 
-#quote[_Effects_ are aspects of the computation that go beyond describing shapes of values.]
+#note-block([Possible _effect_ definition])[
+  _Effects_ are #underline[aspects of the computation] that go beyond describing #bold[shapes of values].
+]
 
-In a strongly typed language, we #emph[want] to use the type system to #underline[track them].
+In a #underline[strongly typed language], we #emph[want] to use the type system to *track them*.
 
 === What is an effect?
 
-#underline[What] is modeled as an effect is a question of language or library design.
+#underline[What] is modeled as an *effect* is a question of language or library design.
 
-- *Reading* or *writing* to mutable state outside functions
-- *Throwing* an exception to indicate abnormal termination
-- *IO* operations
-- *Network* operations
-- *Suspending* or *resuming* computations
+- #bold[Reading] or #bold[writing] to mutable state outside functions
+- #bold[Throwing] an exception to indicate abnormal termination
+- #bold[IO] operations
+- #bold[Network] operations
+- #bold[Suspending] or #bold[resuming] computations
 
 == What is an effect system?
 
-*Effect systems* extends the guarantees of programming languages from type safety to _effect safety_: all the effects are #underline[eventually handled], and not accidentally handled by the wrong handler.
+#feature-block("Effect Systems")[
+An *Effect system* extends the guarantees of programming languages from type safety to _effect safety_: all the effects are #underline[eventually handled], and not accidentally handled by the wrong handler.
+]
+
+#focus-slide[How many of you *have dealt* with an effect system?]
+
+== Java Checked Exceptions
+
+```java
+public String readFile(String path) throws IOException {
+    // read file content
+}
+```
+The `throws IOException` clause is an *effect* that indicates that the function may raise an `IOException`.
+
+The compiler #underline[forces] the caller to handle the possible exceptions.
+
+#feature-block("The most adopted form of effect system")[
+  Java *checked exceptions* are the most widely adopted effect system in the wild.
+]
+
+== Two main approaches
 
 #components.side-by-side[
 === Continuation-passing style
 
 - Explicit control flow manipulation
 - Enables advanced patterns: _non-local returns_, _backtracking_, _coroutines_, ...
-- _Powerful_ composition but *hard to reason about*
+- _Powerful_ but *hard to reason about*
 
 ][
 === Direct style
@@ -125,7 +136,7 @@ In a strongly typed language, we #emph[want] to use the type system to #underlin
 - Code _closer_ to *imperative* style and *easier* to reason about
 ]
 
-== Taste of effect systems types
+== The two styles in Scala
 
 === Monad-based effect systems
 
@@ -159,7 +170,7 @@ Also in this case the *effects* are _explicitly_ defined in the function signatu
 
 The implementation is _closer_ to the *imperative style*, and the _effects_ are _directly_ handled in the code.
 
-== Direct-style effect systems
+== Pros and Cons\*
 
 #components.side-by-side[
   === Direct style
@@ -179,7 +190,7 @@ The implementation is _closer_ to the *imperative style*, and the _effects_ are 
 
 #only("2")[
   #align(center)[
-    \*That's my *personal view*! #fa-smile()
+    \*That's my *personal interpretation*! #fa-smile()
   ]
 ]
 // == Downsides of both approaches
@@ -203,7 +214,235 @@ The implementation is _closer_ to the *imperative style*, and the _effects_ are 
   Where is *`Scala 3`* going?
 ]
 
-= Motivations
+#slide(title: "Where is Scala 3 going?")[
+  #figure(image("images/direct-vs-monadic-scala.jpg"))
+]
+
+= Safer exceptions in Scala 3
+
+== Why Exceptions?
+
+Exceptions are an *ideal* mechanism for error handling in many situations.
+
+- They #bold[propagates] error conditions with minimal boilerplate;
+- #bold[Zero-overhead] for the "happy path";
+- Are #bold[debug-friendly], with stack traces and all;
+
+```scala
+def readFile(path: String): String =
+  val source = Source.fromFile(path)
+  try
+    source.getLines().mkString("\n")
+  finally
+    source.close()
+```
+
+== Why not Exceptions?
+
+Exceptions in Scala and many other languages *are not reflected* in the type system. \
+This means that an #bold[essential] part of the function's contract is not *statically checked*.
+
+#components.side-by-side(columns: (auto, 1fr))[
+  A #strike[good] example are *Java checked exceptions*:
+
+  - Do the #bold[right thing], in principle;
+  - Widely regarded as a #bold[mistake] (difficult to deal with)
+][
+  #figure(image("images/java-checked-exceptions.jpg", width: 100%))
+]
+
+None of the Java' successor or build in the JVM has copied this mechanism.
+
+Anders Hejlsberg's statement on why C\# does not have checked exceptions. #footnote(link("https://www.artima.com/articles/the-trouble-with-checked-exceptions"))
+
+== The problem with Java's checked exceptions
+
+Java's checked exceptions are #bold[inflexible], due to *lack of polymorphism*.
+
+```scala
+  def map[B](f: A => B): List[B]
+```
+
+In the Java model, function `f` #bold[is not allowed] to throw checked exceptions.
+
+The following code is invalid:
+
+```scala
+xs.map(x => if x < limit then x * x else throw LimitExceeded())
+```
+
+A workaround is to #bold[wrap] the exception in an unchecked one:
+
+```scala
+try
+  xs.map(x => if x < limit then x * x else throw Wrapper(LimitExceeded()))
+catch case Wrapper(ex) => throw ex
+```
+
+Ugh! That's why checked exceptions in Java are not very popular #fa-smile()
+
+== Monadic effects -- The dilemma
+
+/ Dilemma: Exceptions are easy to use only as long we #underline[forget static type checking].
+
+A popular alternative solution is to use the #bold[error monad], aka `Either`:
+
+```scala
+def readFile(path: String): Either[IOException, String] = ...
+```
+
+This approach #bold[enables] static checking of possible errors, however:
+
+- Make the code #bold[more complex] to #bold[harder to refactor]
+- The classical problem of #bold[composing] with other monadic effects
+
+== From Effects to Capabilities
+
+The `map` function work so poorly with checked exceptions because forces the parameters *to not throw* any checked exception.
+
+```scala
+def map[B, E](f: A => B throws E): List[B] throws E
+```
+
+This assumes a type `A throws E` to indicate a computation of type `A` that may throw exceptions of type `E`.
+
+#fa-warning() Lot of *cerimony* we don't want to deal with!
+
+#pagebreak()
+
+There is a way to avoid all this #bold[cerimony] by *changing the way we think about effects*.
+
+#feature-block("From effects to capabilities")[
+Instead of concentrating on #bold[possible effects] such as _"this code might throw an exception"_, concentrate on *capabilities* such as _"this code needs the capability to throw an exception"_.
+]
+
+== The `CanThrow` capability
+
+#note-block("Effect as capability")[
+  In the "effect as capability" approach, an *effect* is modeled as an (implicit) parameter of a #underline[certain type].
+]
+
+```scala
+erased class CanThrow[-E <: Exception]
+```
+
+For exceptions, the capability is `CanThrow[E]`, meaning that the code is allowed to throw exceptions of type `E`.
+
+```scala
+infix type throws[R, -E <: Exception] = CanThrow[E] ?=> R
+```
+
+```scala
+def m[T](x: T)(using CanThrow[E]): T
+def m[T](x: T): T throws E
+```
+
+#pagebreak()
+
+```scala
+def m(x: T): U throws E1 | E2
+def m(x: T): U throws E1 throws E2
+def m(x: T)(using CanThrow[E1], CanThrow[E2]): U
+def m(x: T)(using CanThrow[E1])(using CanThrow[E2]): U
+def m(x: T)(using CanThrow[E1]): U throws E2
+```
+
+The `CanThrow/throws` capability propagates the `CanThrow` requirement outwards. But how this capability is created?
+
+```scala
+try
+  erased given CanThrow[Ex1 | ... | ExN] = compiletime.erasedValue
+  body
+catch ...
+```
+
+= Example
+
+== Example
+// Enable the experimental feature:
+// ```scala
+// import language.experimental.saferExceptions
+// ```
+
+Define a `LimitExceeded` exception and a function that may throw it:
+
+```scala
+val limit = 10e9
+class LimitExceeded extends Exception
+def f(x: Double): Double =
+  if x < limit then x * x else throw LimitExceeded()
+```
+
+#only("2")[
+We get this compile-time error:
+
+#local(number-format: none, zebra-fill: none, fill: luma(240),
+```
+  if x < limit then x * x else throw LimitExceeded()
+                               ^^^^^^^^^^^^^^^^^^^^^
+The capability to throw exception LimitExceeded is missing.
+```
+)
+]
+
+#pagebreak()
+
+```scala
+def f(x: Double): Double throws LimitExceeded =
+  if x < limit then x * x else throw LimitExceeded()
+```
+
+The capability is injected by the `try/catch` block.
+
+```scala
+@main def test(xs: Double*) =
+  try println(xs.map(f).sum)
+  catch case ex: LimitExceeded => println("too large")
+```
+
+== Caveats
+
+The current capability model allows to *declare* and *check* the thrown exceptions of #underline[first-order] code.
+
+But as it stands, it does not give us enough mechanism to enforce the absence of capabilities for arguments to *higher-order* functions.
+
+```scala
+def escaped(xs: Double*): () => Int =
+  try () => xs.map(f).sum
+  catch case ex: LimitExceeded => () => -1
+```
+
+#pagebreak()
+
+Expands to:
+
+```scala
+// compiler-generated code
+def escaped(xs: Double*): () => Int =
+  try
+    given ctl: CanThrow[LimitExceeded] = ???
+    () => xs.map(x => f(x)(using ctl)).sum
+  catch case ex: LimitExceeded => -1
+```
+
+But if you try to call escaped like this:
+
+```scala
+val g = escaped(1, 2, 1000000000)
+g() // throws LimitExceeded even if we enclosed it in a try/catch
+```
+
+#pagebreak()
+
+What's missing is that `try` #bold[should enforce] that the capabilities it generates *do not escape* as free variables in the result of its body.
+
+It makes sense to describe such scoped effects as *ephemeral capabilities*-they have #bold[lifetimes] that cannot be extended to delayed code in a lambda.
+#v(2em)
+#only("2")[
+  #align(center)[#text(size: 1.2em)[Hey, some #fa-rust() vibes here!]]
+]
+
+= Capture Checking
 
 == Motivating Example
 
@@ -231,13 +470,13 @@ Code example: `01-leaking-logger.scala`
 
 == Capture Checking
 
-Capture checking enables to spot this kind of problems *statically*.
+*Capture Checking* enables to spot this kind of problems #bold[statically].
 
-In Scala, by enabling *Capture Checking* via:
+_Capture Checking_ is an experimental feature in Scala 3 that can be enabled with:
 ```scala
 import language.experimental.captureChecking
 ```
-it is possible to re-write the previous code as follows:
+It is possible to re-write the previous code as follows:
 
 ```scala
 def usingLogFile[T](op: FileOutputStream^ => T): T =
@@ -252,16 +491,56 @@ The `^` turns the `FileOutputStream` into a *capability*, whose #bold[lifetime] 
 == Compile-time Error
 
 If we try to execute the problematic code again, we get a #emph[compile-time error]:
-```scala
-|  val later = usingLogFile { file => (y: Int) => file.write(y) }
-|              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-|The expression's type Int => Unit is not allowed to capture the root capability `cap`.
-|This usually means that a capability persists longer than its allowed lifetime.
+#local(number-format: none, zebra-fill: none, fill: luma(240),
 ```
+[error] ./code/01-leaking-logger.scala:7:13
+[error] local reference f leaks into outer capture set of type parameter T of method usingLogFile in object LeakingLogger
+[error]     val a = usingLogFile { f => () => f.write(0) }
+[error]             ^^^^^^^^^^^^
+```
+)
 
 It is trivial to observe that `logFile` capability *escapes* in the closure passed to `usingLogFile`.
 
 But of course, this mechanism is able to detect more #emph[complex cases].
+
+== Rust analogy
+
+This mechanism is similar to the #bold[lifetimes] and #bold[borrowing] mechanism in #fa-rust():
+
+```rust
+fn using_log_file<T>(op: impl FnOnce(&mut File) -> T) -> T {
+    let mut log_file = File::create("log").unwrap();
+    let result = op(&mut log_file);
+    // log_file is automatically closed here (Drop trait)
+    result
+}
+```
+
+#pagebreak()
+
+Calling code:
+
+```rust
+using_log_file(|f| { || { f.write(&[0]) } });
+```
+
+#local(number-format: none, zebra-fill: none, fill: luma(240),
+```
+   Compiling playground v0.0.1 (/playground)
+error: lifetime may not live long enough
+  --> src/main.rs:64:26
+   |
+64 |  using_log_file(|f| { || { f.write(&[0]) } });
+   |                 --  ^^^^^^^^^^^^^^^^^^^^ returning this value requires
+   | that `'1` must outlive `'2`
+   |                       ||
+   |                       |return type of closure `{...}` contains a
+   | lifetime `'2` has type `&'1 mut File`
+  
+```
+)
+
 
 == Complex Example
 
@@ -295,7 +574,10 @@ val xs = usingLogFile: f =>
 ]
 ]
 
-Note: this assume a "capture-aware" implementation of `LazyList`.
+#only("3")[
+  Note: this assume a "capture-aware" implementation of `LazyList`.
+]
+
 
 == Applicability
 
@@ -327,7 +609,6 @@ meaning that `T` can capture #emph[any capability].
 class FileSystem
 class Logger(fs: FileSystem^):
   def log(s: String): Unit = ... // Write to a log file, using `fs`
-
 def test(fs: FileSystem^) =
   val l: Logger^{fs} = Logger(fs)
   l.log("hello world!")
@@ -339,7 +620,7 @@ def test(fs: FileSystem^) =
       }
   xs
 ```
-Code example: `02-logger-example.scala`
+// Code example: `02-logger-example.scala`
 
 == Capabilities and Capturing Types
 
@@ -432,33 +713,56 @@ A subcapturing relation $C_1 <: C_2$ holds if $C_2$ #bold[accounts] for all the 
 // - $c in C_2$
 // - $c$'s type has a captuing set $C$ and $C_2$ #bold[accounts] for all the capabilities in $C$.
 
-== Escape checking
+== Escape Checking
 
-If a *capturing type* is an instance of a #underline[type variable], that capturing type is #underline[not allowed] to carry the *universal capability* `cap`.
-
-The *capture set* of a type has to be present in the _environment_ when the type is instantiated from a type variable.
-
-But `cap` is #bold[not itself available] as a global entity in the environment.
+#feature-block("Escape Checking")[
+  *Capabilities* follow the _scoping discipline_, meaning that capture sets can contain only capabilities that are visible at the point where the set is defined.
+]
 
 == Reasoning steps for raising the error
 
-```scala
-def usingLogFile[T](op: FileOutputStream^ => T): T =
-  val logFile = FileOutputStream("log")
-  val result = op(logFile)
-  logFile.close()
-  result
+// ```scala
+// def usingLogFile[T](op: FileOutputStream^ => T): T =
+//   val logFile = FileOutputStream("log")
+//   val result = op(logFile)
+//   logFile.close()
+//   result
+// val later = usingLogFile { file => (y: Int) => file.write(y) }
+// ```
 
-val later = usingLogFile { file => (y: Int) => file.write(y) }
+#local(number-format: none, zebra-fill: none, fill: luma(240),
+```
+  val later = usingLogFile { f => () => f.write(0) }
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^
+  ./01-leaking-logger.scala:7:26
+  Found:    (f: java.io.FileOutputStream^) ->'s2 () ->{f} Unit
+  Required: java.io.FileOutputStream^ => () ->'s3 Unit
+  
+  Note that capability f cannot be included in outer capture set 's3.
+```
+)
+
+1. The parameter `file` has type `FileOutputStream^` making it a *capability*;
+2. Therefore, the type of the expression: `() ->{f} Unit`;
+3. Consequently, `(f: FileOutputStream^) =>'s2 () ->{f} Unit`, for some set `'s2`;
+4. The closure type is `FileOutputStream^ => T` for some instantiated type `T`;
+5. `T` must have shape `() ->'s3 Unit`, for some set `'s3` at `later` level;
+6. That set cannot include `f`, since `f` is not in scope at that level;
+
+== Restrictions for mutable variables
+
+Another restriction applies to #bold[mutable variables].
+
+```scala
+var loophole: () => Unit = () => ()
+usingLogFile { f =>
+  loophole = () => f.write(0)
+}
+loophole()
 ```
 
-1. The parameter `file` has type `FileOutputStream^` making it a *capability*.
-2. Therefore, the type of the expression: `Int ->{file} Unit`
-3. Consequently, `(file: FileOutputStream^) => Int ->{file} Unit`
-4. The closure type is `FielOutputStream^ => T` for some instantiated type `T`.
-5. We cannot instantiate `T` with `Int ->{file} Unit` since the *expected function type is not dependent*.
-  So the smallest supertype that matches is `Int ->{cap} Unit`.
-6. The type variable `T` is instantiated with `Int ->{cap} Unit`, which *is not possible*
+This will not compile either, since the _capture set_ of `loophole` cannot refer to `f`,
+which is not in scope at that level.
 
 #focus-slide[
   How can CC be used for more *safe* effecfull computation?
@@ -525,9 +829,8 @@ trait IO:
 
 object IO:
   def run[R](program: EffectIO[R]): R^{program} =
-    runWithHandler(program)(using consoleHandler)
-
-  def runWithHandler[R](program: EffectIO[R])(using io: IO): R^{program} =
+    run(program)(using consoleHandler)
+  def run[R](program: EffectIO[R])(using io: IO): R^{program} =
     program(using io)
 ```
 
@@ -537,25 +840,269 @@ This *capture-aware* implementation of `IO` is able to intercept the example abo
 
 If we try to compile the same code with the *capture-aware* implementation of `IO`, we get a compile-time error:
 
-```scala
-Found:    (x: IterableOnce[String]^?) ->? IterableOnce[String]^?
-Required: IterableOnce[String]^ => IterableOnce[String]^?
-
-where:    => refers to a fresh root capability created in anonymous function of type (using contextual$4: safeio.IO): IterableOnce[String] when checking argument to parameter combine of method read
-          ^  refers to the universal root capability
+#local(number-format: none, zebra-fill: none, fill: luma(240),
 ```
+Found:    (x: IterableOnce[String]^'s1) ->'s2 (IterableOnce[String]^'s3)?
+Required: IterableOnce[String]^ => (IterableOnce[String]^'s4)?
+
+Note that capability cap is not included in capture set {}.
+```
+)
 
 Any unsafe usage of `read` will be caught at compile time.
 
 Code example: `05-safer-io.scala`
 
+= Capability Polymorphism
+
+== 
+
+It is convenient sometimes to write operations *parametrized* over a capture set of capabilities.
+
+Consider a `Source` on which `Listeners` can be registered and which they can hold certain capabilities.
+
+```scala
+class Source[X^]:
+  private var listeners: Set[Listener^{X}] = Set.empty
+  def register(x: Listener^{X}): Unit =
+    listeners += x
+
+  def allListeners: Set[Listener^{X}] = listeners
+```
+
+The type variable `X^` can be instantiated with a set of arbitrary capabilities.
+Thus, `X` #bold[can occur] in capture sets in *its scope*.
+
+== Example
+
+Capture-set variables can be #bold[inferred] like regular type variables. When they should be instantiated #bold[explicitly] one supplies a concrete capture set. For instance:
+
+```scala
+class Async extends caps.SharedCapability
+
+def listener(async: Async): Listener^{async} = ???
+
+def test1(async1: Async, others: List[Async]) =
+  val src = Source[{async1, others*}]
+  ...
+```
+
+Here `src` is instantiated to `Source` on which listeners can refer to the `async1` capability,
+or to any of the capabilities in `others`.
+
+#pagebreak()
+
+The following code is valid:
+
+```scala
+src.register(listener(async1))
+others.map(listener).foreach(src.register)
+val ls: Set[Listener^{async, others*}] = src.allListeners
+```
+
+= Capability Classifiers
+
+== Introduction
+
+Capabilities are *extremely versatile*.
+
+#components.side-by-side[
+They may represents:
+- Exceptions
+- Continuations,
+- I/O
+- Mutation
+- Information flow
+- security permissions
+- ...
+][
+  Sometimes we want to #bold[restrict] or #bold[classify] what kind of capabilities are expected or returned in a context.
+
+  We might want only *control* capabilities such as `CanThrow` or `Label`s but no others.
+
+  Or we only want *mutation*, but no other capabilities.
+]
+
+#pagebreak()
+
+For instance
+
+```scala
+trait Control extends SharedCapability, Classifier
+```
+
+The Gears library #footnote(link("https://github.com/lampepfl/gears")) uses the `Control` classifier in its `Async` definition:
+
+```scala
+trait Async extends Control
+```
+
+#warning-block("Restriction")[
+  Unlike normal inheritance, classifiers #bold[restrict] the capture set of a capability.
+]
+
+== Example
+
+```scala
+def f(using async: Async) = body
+```
+
+We have the guarantee that any capabilities captured by `async` *must* be a `Control` capability.
+
+A classifier is a `class` or `trait` extending *directly* the `Classifier` trait.
+
+So with definition, `Control` is a classifier trait, but `Async` is not, since it extends `Classifier` indirectly through `Control`.
+
+#note-block("Classifiers are unique")[
+A class cannot extend directly or transitively at the same time two unrelated classifier traits.
+If a class transitively extends two classifier `C1` and `C2`, then one of them must be a #bold[subtrait] of the other.
+]
+
+== Predefined Classifiers
+
+```scala
+trait Classifier
+
+sealed trait Capability
+
+trait SharedCapability extends Capability Classifier
+trait Control extends SharedCapability, Classifier
+
+trait ExclusiveCapability extends Capability, Classifier
+trait Mutable extends ExclusiveCapability, Classifier
+```
+
+= Separation Checking
+
+== Introduction
+
+*Separation Checking* is an extension of the capture checking that enforces unique, un-aliased access to capabilities.
+
+#feature-block("Separation Checking")[
+  The purpose of *separation checking* is to ensure that certain accesses to capabilities are #bold[not aliased].
+]
+
+== Example
+
+Consider matrix multiplication:
+
+```scala
+def multiply(a: Matrix, b: Matrix, c: Matrix): Unit
+```
+
+Such signature formulation do not tell us which matrices are supposed to be _inputs_, and which one is the _output_.
+
+It #bold[does not guarantee] that an input matrix is not re-used as output matrix.
+
+== With Separation Checking
+
+With separation checking, we can write:
+
+```scala
+class Matrix(nrows: Int, ncols: Int) extends Mutable:
+  update def setElem(i: Int, j: Int, x: Double): Unit = ???
+  def getElem(i: Int, j: Int): Double = ???
+```
+
+We declare the `setElem` method with the `update` modifier, indicating that it has *side effects*.
+
+#pagebreak()
+
+With separation checking, the following definition has a #bold[special] meaning:
+
+```scala
+def multiply(a: Matrix, b: Matrix, c: Matrix^): Unit
+```
+
+Now `c` carries the _universal capability_.
+
+The following _two_ properties are ensured:
+
+- Matrices `a`, and `b` are #bold[read-only]. `multiply` will not call their update method.
+- Matrices `a`, and `b` #bold[are different] from `c`. But `a` and `b` may refer to the same matrix.
+
+=== Unaliased access
+
+Effectively, anything that can be updated must be *unaliased*.
+
+== The `Mutable` trait
+
+```scala
+trait Mutable extends ExclusiveCapability, Classifier
+```
+
+It is used to types that define *update methods* using a new soft modifier `update`.
+
+=== Example
+
+```scala
+class Ref(init: Int) extends Mutable:
+  private var current = init
+  def get: Int = current
+  update def set(x: Int): Unit = current = x
+```
+
+`update` can only be used in classes or objects that extend `Mutable`.
+
+- An #bold[update method] is allowed to access exclusive capabilities in method's env
+- A #bold[normal method] may access exclusive capabilities only if they are defined locally, or passed as parameters.
+
+== Mutable Types
+
+#feature-block("Mutable Types Definition")[
+  A type is *mutable* if it extends `Mutable` and it has an `update` method (or class) as non-private member or constructor.
+]
+
+When we create an instance of a *mutable* type we always add `cap` to its capture set.
+
+```scala
+val ref: Ref[Int]^ = new Ref[Int](0)
+```
+== Read-only Capabilities
+
+if `x` is an exclusive capability of a type extending `Mutable`, `x.rd` is its associated *read-only* capability.
+
+It can be considered as a #bold[shared capability].
+
+#warning-block("Read-only capability")[
+  A read-only capability #bold[does not allow] access to mutable fields.
+]
+
+== Implicitly added capture sets
+
+A reference to a type extending `Mutable` gets an implicit capture set `{cap.rd}` when *no explicit capture set* is provided.
+
+```scala
+def mul(a: Matrix, b: Matrix, c: Matrix^): Unit
+```
+
+expands to:
+
+```scala
+def mul(a: Matrix^{cap.rd}, b: Matrix^{cap.rd}, c: Matrix^{cap}): Unit
+```
+
+Separation checking will ensure that `a` and `b` are different from `c`.
+
 == Wrapping up
 
-They are pursuing the #bold[direct-style] approach to model effects in Scala 3.
+#components.side-by-side(columns: (1.5fr, 2fr))[
+  #figure(image("images/oxidizing-scala.png", width: 100%))
+][
+  - Scala 3 is *oxidizing* towards more #bold[safe] effect handling
+    - A lot of #fa-rust() vibes!
+  - *Capabilities* are a powerful and #bold[general] way to model effects
+  - Bring *more safety* without sacrificing #bold[ease of use]
+  - Still highly #bold[experimental]
+    - Oriented for _library authors_
+    - More safe _stdlib_
+]
 
-This simplify the code and make it #underline[easier to reason about].
+// They are pursuing the #bold[direct-style] approach to model effects in Scala 3.
 
-But *less safe* than the monadic approach.
+// This simplify the code and make it #underline[easier to reason about].
 
-The *capture checking* mechanism is able to catch a lot of problems at compile time trying to have more safety in the #bold[direct-style] approach.
+// But *less safe* than the monadic approach.
+
+// The *capture checking* mechanism is able to catch a lot of problems at compile time trying to have more safety in the #bold[direct-style] approach.
 

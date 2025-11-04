@@ -91,7 +91,7 @@
   )
 }
 
-#let warning-block(title, content, icon: fa-exclamation-triangle() + " ") = {
+#let warning-block(icon: fa-exclamation-triangle() + " ", title, content) = {
   styled-block(
     title, 
     content, 
