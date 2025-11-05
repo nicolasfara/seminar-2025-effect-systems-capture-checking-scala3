@@ -35,7 +35,7 @@
 #show math.equation: set text(size: 20pt)
 
 // #set raw(tab-size: 4)
-// #show raw: set text(size: 1em)
+#show raw: set text(size: 1em)
 // #show raw.where(block: true): block.with(
 //   fill: luma(240),
 //   inset: (x: 1em, y: 1em),
@@ -976,13 +976,20 @@ trait Mutable extends ExclusiveCapability, Classifier
 
 == Introduction
 
-*Separation Checking* is an extension of the capture checking that enforces unique, un-aliased access to capabilities.
+*Separation Checking* /*#cite(label("DBLP:journals/pacmpl/XuBO24"))*/ is an extension of the _capture checking_ that enforces unique, un-aliased access to capabilities.
 
 #feature-block("Separation Checking")[
   The purpose of *separation checking* is to ensure that certain accesses to capabilities are #bold[not aliased].
 ]
 
+- Statically prevents #underline[data races] in parallel programming
+- Tracks #underline[aliasing] and controls #underline[mutable] state access
+
 == Example
+
+#feature-block("Control as you need")[
+  Aliases are allowed by default, but #bold[tracked] and #bold[controlled] when necessary to prevent data races.
+]
 
 Consider matrix multiplication:
 
@@ -1083,6 +1090,66 @@ def mul(a: Matrix^{cap.rd}, b: Matrix^{cap.rd}, c: Matrix^{cap}): Unit
 ```
 
 Separation checking will ensure that `a` and `b` are different from `c`.
+
+== Separation checking flexibility
+
+Consider the following code:
+
+```rust
+struct Vec2 { x: i32, y: i32 }
+
+fn update<F, G>(p: &mut Vec2, mut f: F, mut g: G)
+  where F: FnMut(&i32) -> i32, G: FnMut(&i32) -> i32 {
+    p.x = f(&p.x); p.y = g(&p.y);
+}
+
+fn main() {
+    let mut p = Vec2 { x: 1, y: 2 };
+    let mut sum = 0;
+    update(&mut p, |&x| { sum += x; x + 1 }, |&y| { sum += y; y + 1 });
+}
+```
+
+#text(size: 0.69em)[
+  #local(number-format: none, zebra-fill: none, fill: luma(240),
+  ```
+  error[E0499]: cannot borrow `sum` as mutable more than once at a time
+    --> src/main.rs:11:46
+    |
+  11 |     update(&mut p, |&x| { sum += x; x + 1 }, |&y| { sum += y; y + 1 });
+    |     ------         ----   ---                ^^^^   --- second borrow occurs due to use of `sum` in closure
+    |     |              |      |                  |
+    |     |              |      |                  second mutable borrow occurs here
+    |     |              |      first borrow occurs due to use of `sum` in closure
+    |     |              first mutable borrow occurs here
+    |     first borrow later used by call
+  ```
+  )
+]
+
+Arguably, this is a #underline[reasonable] programming pattern...
+
+In the last line of main, although both closures *retain a mutable alias* to sum, the two closures #bold[execute sequentially], thus being devoid of data races.
+
+== Concurrent updates
+
+With *separation checking* we want to statically reject code suffering from #bold[data races]:
+
+#show raw: set text(size: 1em)
+```scala
+def seq(f: () => Unit; g: () ->{cap, f} Unit): Unit =
+  f(); g()
+```
+
+Here, the `g` parameter explicitly mentions `f` in its potential capture set.
+
+This means that the `cap` in the same capture set would #bold[not need to hide] the first argument, since *it already appears explicitly in the same set*.
+
+```scala
+val r = Ref(1)
+val plusOne = r.set(r.get + 1)
+seq(plusOne, plusOne)
+```
 
 == Wrapping up
 
