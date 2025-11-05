@@ -6,6 +6,8 @@
 
 - Capturing Types
     - https://doi.org/10.1145/3618003
+- Separation Checking
+    - https://doi.org/10.1145/3649853
 
 ### Informal
 - https://noelwelsh.com/posts/direct-style/
