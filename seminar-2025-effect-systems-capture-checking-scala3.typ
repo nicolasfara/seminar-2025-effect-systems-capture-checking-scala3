@@ -524,22 +524,20 @@ Calling code:
 ```rust
 using_log_file(|f| { || { f.write(&[0]) } });
 ```
-
+#text(size: 0.7em)[
 #local(number-format: none, zebra-fill: none, fill: luma(240),
 ```
-   Compiling playground v0.0.1 (/playground)
 error: lifetime may not live long enough
-  --> src/main.rs:64:26
+  --> src/main.rs:13:26
    |
-64 |  using_log_file(|f| { || { f.write(&[0]) } });
-   |                 --  ^^^^^^^^^^^^^^^^^^^^ returning this value requires
-   | that `'1` must outlive `'2`
-   |                       ||
-   |                       |return type of closure `{...}` contains a
-   | lifetime `'2` has type `&'1 mut File`
-  
+13 |     using_log_file(|f| { || { f.write(&[0]) } });
+   |                     --   ^^^^^^^^^^^^^^^^^^^^ returning this value requires that `'1` must outlive `'2`
+   |                     ||
+   |                     |return type of closure `{closure@src/main.rs:13:26: 13:28}` contains a lifetime `'2`
+   |                     has type `&'1 mut File`
 ```
 )
+]
 
 
 == Complex Example
